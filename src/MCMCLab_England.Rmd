@@ -150,7 +150,7 @@ for(i in 1:n_check){
   # draw_mean
   mean_check[i] <- draw_mean(
       mu_0 = 0 # assume flat prior
-      , sigma.sq_0 = n_check # assume flat prior (the variance is the full range of data 0 to n)
+      , sigma.sq_0 = n_check # assume flat prior (the variance is a very large number to be uniformative)
       , varsigma.sq = varsigma_sq_check
       , y = y_check
     )$z # this returns only the random variable from the draw
@@ -197,7 +197,7 @@ Assign initial values to the first column of each matrix, a different value for 
 ```{r}
 # set initial values in first column
 posterior_mean[1:3, 1] <- c(123, 111, 85)
-posterior_variance[1:3, 1] <- c(33, 11, 3)
+posterior_variance[1:3, 1] <- c(33, 21, 3)
 # check
 posterior_mean[,1:6]
 posterior_variance[,1:6]
@@ -219,7 +219,7 @@ for(c in 1:n_chains){
     # draw_mean
     posterior_mean[c, i] <- draw_mean(
         mu_0 = 0 # assume flat prior
-        , sigma.sq_0 = n_iterations # assume flat prior (the variance is the full range of data 0 to n)
+        , sigma.sq_0 = n_iterations # assume flat prior (the variance is a very large number to be uniformative)
         , varsigma.sq = posterior_variance[c, i-1]
         , y = y
       )$z # this returns only the random variable from the draw
@@ -373,17 +373,246 @@ ggplot(
 
 For both $\theta$ and $\varsigma^2$, calculate the mean of all the chains combined and its standard deviation. Interpret these quantities.
 
+### For $\theta$:
+
+* \textcolor{violet}{The mean of the draws for all chains combined from the marginal posterior distribution for $\theta$ discarding the first 1000 iterations as burn-in is:} **\textcolor{violet}{`r scales::comma(mean(posterior_mean_burnin$value), accuracy = .01)`}**
+* \textcolor{violet}{The standard deviation of the draws for all chains combined from the marginal posterior distribution for $\theta$ discarding the first 1000 iterations as burn-in is:} **\textcolor{violet}{`r scales::comma(sd(posterior_mean_burnin$value), accuracy = .01)`}**
+
+### For $\varsigma^2$:
+
+* \textcolor{violet}{The mean of the draws for all chains combined from the marginal posterior distribution for $\varsigma^2$ discarding the first 1000 iterations as burn-in is:} **\textcolor{violet}{`r scales::comma(mean(posterior_variance_burnin$value), accuracy = .01)`}**
+* \textcolor{violet}{The standard deviation of the draws for all chains combined from the marginal posterior distribution for $\varsigma^2$ discarding the first 1000 iterations as burn-in is:} **\textcolor{violet}{`r scales::comma(sd(posterior_variance_burnin$value), accuracy = .01)`}**
+
+\textcolor{violet}{The generating value of $\theta$ = `r scales::comma(theta, accuracy = .1)` and the generating value of $\varsigma^2$ =  `r scales::comma(varsigma_sq, accuracy = .1)`. The simulated values shown above are close to the generating value for both $\theta$ and $\varsigma^2$ but they are not exact. This is due to the random process of generating the data and the relatively small sample size of 100. As we increase our sample size for the random collection of data, the marginal posteriors of $\theta$ and $\varsigma^2$ should approach the generating value.}
+
+
 ## 5.
 
 Compare the standard deviation of the posterior distribution of $\theta$ with an approximation using the standard deviation of the data divided by the square root of the sample size. What is this approximation called in the frequentist world?
+
+* \textcolor{violet}{The standard deviation of the draws for all chains combined from the marginal posterior distribution for $\theta$ discarding the first 1000 iterations as burn-in is:} **\textcolor{violet}{`r scales::comma(sd(posterior_mean_burnin$value), accuracy = .01)`}**
+
+* \textcolor{violet}{The standard error of the data is calculated as: $SE = \frac{\sigma}{\sqrt{n}}$; where $\sigma$ is the standard deviation of the data and $n$ is the sample size of the data. The standard error of the data `y` is:} **\textcolor{violet}{`r scales::comma(sd(y)/sqrt(length(y)), accuracy = .01)`}**
+
+\textcolor{violet}{The standard deviation of marginal posterior distribution for $\theta$ closely matches the standard error of the data `y`.} 
 
 ## 6.
 
 Vary the number of values in the simulated data set, e.g., n = 10, 100, 1,000, 10,000. We do not exactly recover the generating values of $\theta$ and $\varsigma^2$ when n is small. Why? The mean of the marginal posterior distribution of the variance is further away from its generating value than the mean is. Why? Try different values for set seed with n = 100 and interpret the effect of changing the random number sequence.
 
+```{r, fig.height=8, fig.width=8}
+# set parameters
+n <- 100
+varsigma_sq <- 25
+theta <- 100
+n_iterations <- 10000
+n_chains <- 3
+alpha_0 <- 0.001
+beta_0 <- 0.001
+burnin <- 1000
+# set up plot grid
+plts <- list()
+mean_limt <- c(round(min(posterior_mean_burnin$value)*.97), round(max(posterior_mean_burnin$value)*1.03))
+var_limt <- c(round(min(posterior_variance_burnin$value)*.93), round(max(posterior_variance_burnin$value)*1.07))
+these_ns <- c(10, 100, 1000, 10000)
+for(this_n in 1:length(these_ns)) {
+  # draw random sample
+  temp_y <- rnorm(n = these_ns[this_n], mean = theta, sd = sqrt(varsigma_sq))
+  # set up matrix for storing samples
+  temp_mean <- matrix(nrow = n_chains, ncol = n_iterations)
+  temp_variance <- matrix(nrow = n_chains, ncol = n_iterations)
+  # set initial values in first column
+  temp_mean[1:3, 1] <- c(123, 111, 85)
+  temp_variance[1:3, 1] <- c(33, 21, 3)
+  # A vague prior for the inverse gamma has parameters:
+  #  nested for loops to simulate posterior dist
+  for(c in 1:n_chains){
+    for(i in 2:n_iterations){
+      # draw_mean
+      temp_mean[c, i] <- draw_mean(
+          mu_0 = 0 # assume flat prior
+          , sigma.sq_0 = n_iterations # assume flat prior (the variance is a very large number to be uniformative)
+          , varsigma.sq = temp_variance[c, i-1]
+          , y = temp_y
+        )$z # this returns only the random variable from the draw
+      # draw_var
+      temp_variance[c, i] <- draw_var(
+          alpha_0 = alpha_0
+          , beta_0 = beta_0
+          , theta = temp_mean[c, i-1]
+          , y = temp_y
+        )$z # this returns only the random variable from the draw
+    } 
+  }
+  # Discard the first 1000 iterations as burn-in.
+  # make burnin data frames
+  # mean
+  plts[[this_n]] <- 
+    temp_mean[,(burnin+1):n_iterations] %>% 
+      as.data.frame() %>% 
+      dplyr::mutate(chain = as.character(dplyr::row_number())) %>% 
+      tidyr::pivot_longer(
+        cols = tidyr::starts_with("V")
+        , names_to = "iteration"
+        , names_prefix = "V"
+        , values_to = "value"
+        , values_drop_na = FALSE
+      ) %>% 
+      dplyr::mutate(iteration = as.numeric(iteration)+burnin) %>% 
+      # Make a histogram of the samples of the mean retained after burn-in
+      ggplot(
+          data = .
+          , mapping = aes(x = value)
+        ) +
+        geom_histogram(
+          aes(y = ..density..)
+          , bins = 100
+          , fill = "navy"
+          , alpha = 0.8
+          , color = "gray25"
+        ) +
+        geom_density(
+          aes(y = ..density..)
+          , linetype = 2
+          , lwd = 1.2
+          , color = "orangered"
+        ) +
+        geom_vline(xintercept = theta, color = "gray50", linetype = 2, lwd = 1) +
+        annotate("text", x = theta*1.0005, y = 0.5, parse = TRUE, label = "theta", color = "black") +
+        xlab(latex2exp::TeX("$\\theta$ sample value")) +
+        ylab("Density") +
+        scale_x_continuous(limits = mean_limt) +
+        labs(title = paste0("n = ", scales::comma(these_ns[this_n], accuracy = 1))) +
+        theme_bw() + 
+      theme(
+        axis.text = element_text(size = 7)
+        , title = element_text(size = 9)
+      )
+
+  # variance
+  plts[[this_n+length(these_ns)]] <- 
+  temp_variance[,(burnin+1):n_iterations] %>% 
+    as.data.frame() %>% 
+    dplyr::mutate(chain = as.character(dplyr::row_number())) %>% 
+    tidyr::pivot_longer(
+      cols = tidyr::starts_with("V")
+      , names_to = "iteration"
+      , names_prefix = "V"
+      , values_to = "value"
+      , values_drop_na = FALSE
+    ) %>% 
+    dplyr::mutate(iteration = as.numeric(iteration)+burnin) %>% 
+    # Make a histogram of the samples of the variance retained after burn-in
+    ggplot(
+        data = .
+        , mapping = aes(x = value)
+      ) +
+      geom_histogram(
+        aes(y = ..density..)
+        , bins = 100
+        , fill = "steelblue"
+        , alpha = 0.8
+        # , color = "gray25"
+      ) +
+      geom_density(
+        aes(y = ..density..)
+        , linetype = 2
+        , lwd = 1.2
+        , color = "orangered"
+      ) +
+      geom_vline(xintercept = varsigma_sq, color = "gray50", linetype = 2, lwd = 1) +
+      annotate("text", x = varsigma_sq*1.015, y = 0.12, parse = TRUE, label = "varsigma^2", color = "black") +
+      xlab(latex2exp::TeX("$\\varsigma^2$ sample value")) +
+      ylab("Density") +
+      scale_x_continuous(limits = var_limt) +
+      labs(title = paste0("n = ", scales::comma(these_ns[this_n], accuracy = 1))) +
+      theme_bw() + 
+      theme(
+        axis.text = element_text(size = 7)
+        , title = element_text(size = 9)
+      )
+
+}
+remove(list = ls()[grep("temp_",ls())])
+# combine plots
+cowplot::plot_grid(plotlist =  plts, nrow = 2, ncol = length(these_ns))
+
+```
+
+
+\textcolor{violet}{As the number samples in the simulated data increases, the variance of the posterior distribution decreases and the mean of the posterior distribution moves closer to the generating value. The mean of the posterior distribution of $\theta$ and $\varsigma^2$ deviate slightly from the generating value with small sample sizes because the simulated data is just one representation of a random process. The marginal posterior distribution of the variance is further away from its generating value than the mean is because the variance is more sensitive to values in the tails of the data distribution.}
+
 ## 7.
 
 Make the burnin = 1 instead of 1000. Does this change your results? Why or why not?
+
+```{r}
+# Discard the first 1000 iterations as burn-in.
+burnin <- 1
+# Plot the value of the mean as a function of iteration number for each chain
+plt_mean <-
+posterior_mean[,(burnin+1):n_iterations] %>% 
+  as.data.frame() %>% 
+  dplyr::mutate(chain = as.character(dplyr::row_number())) %>% 
+  tidyr::pivot_longer(
+    cols = tidyr::starts_with("V")
+    , names_to = "iteration"
+    , names_prefix = "V"
+    , values_to = "value"
+    , values_drop_na = FALSE
+  ) %>% 
+  dplyr::mutate(iteration = as.numeric(iteration)+burnin) %>% 
+ggplot(
+    data = .
+    , mapping = aes(x = iteration, y = value, color = chain)
+  ) +
+  geom_line(lwd = 1) +
+  scale_color_viridis_d(alpha = 0.7, option = "viridis") +
+  xlab("Iteration number") + 
+  ylab(latex2exp::TeX("$\\theta$")) +
+  labs(title = paste0("burn-in = ", scales::comma(burnin, accuracy = 1))) +
+  theme_bw() +
+  theme(
+    legend.position = "top"
+    , legend.direction = "horizontal"
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 5)))
+
+
+# Plot the value of the variance as a function of iteration number for each chain
+plt_var <-
+posterior_variance[,(burnin+1):n_iterations] %>% 
+  as.data.frame() %>% 
+  dplyr::mutate(chain = as.character(dplyr::row_number())) %>% 
+  tidyr::pivot_longer(
+    cols = tidyr::starts_with("V")
+    , names_to = "iteration"
+    , names_prefix = "V"
+    , values_to = "value"
+    , values_drop_na = FALSE
+  ) %>% 
+  dplyr::mutate(iteration = as.numeric(iteration)+burnin) %>% 
+ggplot(
+    data = .
+    , mapping = aes(x = iteration, y = value, color = chain)
+  ) +
+  geom_line(lwd = 1) +
+  scale_color_viridis_d(alpha = 0.7, option = "plasma") +
+  xlab("Iteration number") + 
+  ylab(latex2exp::TeX("$\\varsigma^2$")) +
+  labs(title = paste0("burn-in = ", scales::comma(burnin, accuracy = 1))) +
+  theme_bw() +
+  theme(
+    legend.position = "top"
+    , legend.direction = "horizontal"
+  ) +
+  guides(color = guide_legend(override.aes = list(size = 5)))
+
+plt_mean
+plt_var
+```
+
+\textcolor{violet}{Changing the burn-in from 1,000 to 1 does not significantly change the final mean of the draws for all chains combined from the marginal posterior distribution for $\theta$ and $\varsigma^2$. As shown in the trace plots above, there is convergence almost immediatly because Gibbs sampling makes "smart" parameter proposals so we retain all of the sampled values. Accept-reject sampling methods like Metropolis and Metropolis-Hastings require lots of computation time because of the several steps required to calculate likelihoods, compute ratios and choose proposals versus current values. These multiple steps result in slower chain convergence.}
 
 ## 8.
 
