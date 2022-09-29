@@ -150,7 +150,7 @@ for(i in 1:n_check){
   # draw_mean
   mean_check[i] <- draw_mean(
       mu_0 = 0 # assume flat prior
-      , sigma.sq_0 = n_check # assume flat prior (the variance is a very large number to be uniformative)
+      , sigma.sq_0 = 10000 # assume flat prior (the variance is a very large number to be uniformative)
       , varsigma.sq = varsigma_sq_check
       , y = y_check
     )$z # this returns only the random variable from the draw
@@ -219,7 +219,7 @@ for(c in 1:n_chains){
     # draw_mean
     posterior_mean[c, i] <- draw_mean(
         mu_0 = 0 # assume flat prior
-        , sigma.sq_0 = n_iterations # assume flat prior (the variance is a very large number to be uniformative)
+        , sigma.sq_0 = 10000 # assume flat prior (the variance is a very large number to be uniformative)
         , varsigma.sq = posterior_variance[c, i-1]
         , y = y
       )$z # this returns only the random variable from the draw
@@ -280,6 +280,7 @@ ggplot(
   scale_color_viridis_d(alpha = 0.7, option = "viridis") +
   xlab("Iteration number") + 
   ylab(latex2exp::TeX("$\\theta$")) +
+  labs(title = paste0("burn-in = ", scales::comma(burnin, accuracy = 1))) +
   theme_bw() +
   theme(
     legend.position = "top"
@@ -334,6 +335,7 @@ ggplot(
   scale_color_viridis_d(alpha = 0.7, option = "plasma") +
   xlab("Iteration number") + 
   ylab(latex2exp::TeX("$\\varsigma^2$")) +
+  labs(title = paste0("burn-in = ", scales::comma(burnin, accuracy = 1))) +
   theme_bw() +
   theme(
     legend.position = "top"
@@ -431,7 +433,7 @@ for(this_n in 1:length(these_ns)) {
       # draw_mean
       temp_mean[c, i] <- draw_mean(
           mu_0 = 0 # assume flat prior
-          , sigma.sq_0 = n_iterations # assume flat prior (the variance is a very large number to be uniformative)
+          , sigma.sq_0 = 10000 # assume flat prior (the variance is a very large number to be uniformative)
           , varsigma.sq = temp_variance[c, i-1]
           , y = temp_y
         )$z # this returns only the random variable from the draw
@@ -469,7 +471,7 @@ for(this_n in 1:length(these_ns)) {
           , bins = 100
           , fill = "navy"
           , alpha = 0.8
-          , color = "gray25"
+          # , color = "gray25"
         ) +
         geom_density(
           aes(y = ..density..)
@@ -478,7 +480,7 @@ for(this_n in 1:length(these_ns)) {
           , color = "orangered"
         ) +
         geom_vline(xintercept = theta, color = "gray50", linetype = 2, lwd = 1) +
-        annotate("text", x = theta*1.0005, y = 0.5, parse = TRUE, label = "theta", color = "black") +
+        # annotate("text", x = theta*1.0005, y = -0.01, parse = TRUE, label = "theta", color = "black") +
         xlab(latex2exp::TeX("$\\theta$ sample value")) +
         ylab("Density") +
         scale_x_continuous(limits = mean_limt) +
@@ -521,7 +523,7 @@ for(this_n in 1:length(these_ns)) {
         , color = "orangered"
       ) +
       geom_vline(xintercept = varsigma_sq, color = "gray50", linetype = 2, lwd = 1) +
-      annotate("text", x = varsigma_sq*1.015, y = 0.12, parse = TRUE, label = "varsigma^2", color = "black") +
+      # annotate("text", x = varsigma_sq*1.015, y = -0.01, parse = TRUE, label = "varsigma^2", color = "black") +
       xlab(latex2exp::TeX("$\\varsigma^2$ sample value")) +
       ylab("Density") +
       scale_x_continuous(limits = var_limt) +
@@ -617,3 +619,49 @@ plt_var
 ## 8.
 
 Reverse the order of the conjugate functions in step 3 of the Writing a Sampler section so that the variance is drawn first followed by the mean. (Be careful, this involves a bit more than simply reversing the order of the functions in the loop). Does this reordering have an effect on the posteriors? Why or why not?
+
+```{r}
+# set parameters
+n_iterations <- 10000
+n_chains <- 3
+# set up matrix for storing samples
+posterior_mean_rev <- matrix(nrow = n_chains, ncol = n_iterations)
+posterior_variance_rev <- matrix(nrow = n_chains, ncol = n_iterations)
+# set initial values in first column
+posterior_mean_rev[1:3, 1] <- c(123, 111, 85)
+posterior_variance_rev[1:3, 1] <- c(33, 21, 3)
+# A vague prior for the inverse gamma has parameters:
+alpha_0 <- 0.001
+beta_0 <- 0.001
+# Set up nested for loops
+for(c in 1:n_chains){
+  for(i in 2:n_iterations){
+    # draw_var
+    posterior_variance_rev[c, i] <- draw_var(
+        alpha_0 = alpha_0
+        , beta_0 = beta_0
+        , theta = posterior_mean_rev[c, i-1]
+        , y = y
+      )$z # this returns only the random variable from the draw
+    # draw_mean
+    posterior_mean_rev[c, i] <- draw_mean(
+        mu_0 = 0 # assume flat prior
+        , sigma.sq_0 = 10000 # assume flat prior (the variance is a very large number to be uniformative)
+        , varsigma.sq = posterior_variance_rev[c, i-1]
+        , y = y
+      )$z # this returns only the random variable from the draw
+  } 
+}
+```
+
+### For $\theta$:
+
+* \textcolor{violet}{Sampling the conjugate function for the mean first, the mean of the draws for all chains combined from the marginal posterior distribution for $\theta$ discarding the first 1000 iterations as burn-in is:} **\textcolor{violet}{`r scales::comma(mean(posterior_mean[,(burnin+1):n_iterations]), accuracy = .01)`}**
+* \textcolor{violet}{Sampling the conjugate function for the variance first, the mean of the draws for all chains combined from the marginal posterior distribution for $\theta$ discarding the first 1000 iterations as burn-in is:} **\textcolor{violet}{`r scales::comma(mean(posterior_mean_rev[,(burnin+1):n_iterations]), accuracy = .01)`}**
+
+### For $\varsigma^2$:
+
+* \textcolor{violet}{Sampling the conjugate function for the mean first, the mean of the draws for all chains combined from the marginal posterior distribution for $\varsigma^2$ discarding the first 1000 iterations as burn-in is:} **\textcolor{violet}{`r scales::comma(mean(posterior_variance[,(burnin+1):n_iterations]), accuracy = .01)`}**
+* \textcolor{violet}{Sampling the conjugate function for the variance first, the mean of the draws for all chains combined from the marginal posterior distribution for $\varsigma^2$ discarding the first 1000 iterations as burn-in is:} **\textcolor{violet}{`r scales::comma(mean(posterior_variance_rev[,(burnin+1):n_iterations]), accuracy = .01)`}**
+
+\textcolor{violet}{This reordering does not seem to have an effect on the posterior distributions of $\theta$ and $\varsigma^2$. The reason that the ordering does not seem to matter is because Gibbs sampling makes "smart" parameter proposals so we retain all of the sampled values and convergence happens quickly.}
